@@ -24,14 +24,14 @@ module Wovnrb
                        else
                          @env['HTTP_HOST']
                        end
-      unless @env.key?('REQUEST_URI')
+      unless @env.key?('ORIGINAL_REQUEST_URI')
         # Add '/' to PATH_INFO as a possible fix for pow server
-        @env['REQUEST_URI'] = (@env['PATH_INFO'] =~ /^[^\/]/ ? '/' : '') + @env['PATH_INFO'] + (@env['QUERY_STRING'].empty? ? '' : "?#{@env['QUERY_STRING']}")
+        @env['ORIGINAL_REQUEST_URI'] = (@env['PATH_INFO'] =~ /^[^\/]/ ? '/' : '') + @env['PATH_INFO'] + (@env['QUERY_STRING'].empty? ? '' : "?#{@env['QUERY_STRING']}")
       end
-      # REQUEST_URI is expected to not contain the server name
+      # ORIGINAL_REQUEST_URI is expected to not contain the server name
       # heroku contains http://...
-      @env['REQUEST_URI'] = @env['REQUEST_URI'].sub(/^.*:\/\/[^\/]+/, '') if @env['REQUEST_URI'] =~ /:\/\//
-      @unmasked_pathname = @env['REQUEST_URI'].split('?')[0]
+      @env['ORIGINAL_REQUEST_URI'] = @env['ORIGINAL_REQUEST_URI'].sub(/^.*:\/\/[^\/]+/, '') if @env['ORIGINAL_REQUEST_URI'] =~ /:\/\//
+      @unmasked_pathname = @env['ORIGINAL_REQUEST_URI'].split('?')[0]
       @unmasked_pathname += '/' unless @unmasked_pathname =~ /\/$/ || @unmasked_pathname =~ /\/[^\/.]+\.[^\/.]+$/
       @unmasked_url = "#{@protocol}://#{@unmasked_host}#{@unmasked_pathname}"
       @host = if settings['use_proxy'] && @env.key?('HTTP_X_FORWARDED_HOST')
@@ -40,7 +40,7 @@ module Wovnrb
                 @env['HTTP_HOST']
               end
       @host = settings['url_pattern'] == 'subdomain' ? remove_lang(@host, lang_code) : @host
-      @pathname, @query = @env['REQUEST_URI'].split('?')
+      @pathname, @query = @env['ORIGINAL_REQUEST_URI'].split('?')
       @pathname = settings['url_pattern'] == 'path' ? remove_lang(@pathname, lang_code) : @pathname
       @query ||= ''
       @url = "#{@host}#{@pathname}#{(!@query.empty? ? '?' : '') + remove_lang(@query, lang_code)}"
@@ -85,9 +85,9 @@ module Wovnrb
       if @path_lang.nil?
         rp = Regexp.new(@settings['url_pattern_reg'])
         match = if @settings['use_proxy'] && @env.key?('HTTP_X_FORWARDED_HOST')
-                  "#{@env['HTTP_X_FORWARDED_HOST']}#{@env['REQUEST_URI']}".match(rp)
+                  "#{@env['HTTP_X_FORWARDED_HOST']}#{@env['ORIGINAL_REQUEST_URI']}".match(rp)
                 else
-                  "#{@env['SERVER_NAME']}#{@env['REQUEST_URI']}".match(rp)
+                  "#{@env['SERVER_NAME']}#{@env['ORIGINAL_REQUEST_URI']}".match(rp)
                 end
         @path_lang = if match && match[:lang] && Lang.get_lang(match[:lang])
                        Lang.get_code(match[:lang])
@@ -129,7 +129,7 @@ module Wovnrb
       if lang == @settings['default_lang']
         # IS THIS RIGHT??
         "#{protocol}://#{url}"
-        # return remove_lang("#{@env['HTTP_HOST']}#{@env['REQUEST_URI']}", lang)
+        # return remove_lang("#{@env['HTTP_HOST']}#{@env['ORIGINAL_REQUEST_URI']}", lang)
       else
         # TODO test
         lang_code = Store.instance.settings['custom_lang_aliases'][lang] || lang
@@ -139,7 +139,7 @@ module Wovnrb
           lang_param_name = @settings['lang_param_name']
           if location !~ /\?/
             location = "#{location}?#{lang_param_name}=#{lang_code}"
-          else @env['REQUEST_URI'] !~ /(\?|&)#{lang_param_name}=/
+          else @env['ORIGINAL_REQUEST_URI'] !~ /(\?|&)#{lang_param_name}=/
                location = "#{location}&#{lang_param_name}=#{lang_code}"
           end
         when 'subdomain'
@@ -156,7 +156,7 @@ module Wovnrb
       @env['wovnrb.target_lang'] = lang_code
       case @settings['url_pattern']
       when 'query'
-        @env['REQUEST_URI'] = remove_lang(@env['REQUEST_URI']) if @env.key?('REQUEST_URI')
+        @env['ORIGINAL_REQUEST_URI'] = remove_lang(@env['ORIGINAL_REQUEST_URI']) if @env.key?('ORIGINAL_REQUEST_URI')
         @env['QUERY_STRING'] = remove_lang(@env['QUERY_STRING']) if @env.key?('QUERY_STRING')
         @env['ORIGINAL_FULLPATH'] = remove_lang(@env['ORIGINAL_FULLPATH']) if @env.key?('ORIGINAL_FULLPATH')
       when 'subdomain'
@@ -169,7 +169,7 @@ module Wovnrb
         @env['HTTP_REFERER'] = remove_lang(@env['HTTP_REFERER']) if @env.key?('HTTP_REFERER')
       # when 'path'
       else
-        @env['REQUEST_URI'] = remove_lang(@env['REQUEST_URI'])
+        @env['ORIGINAL_REQUEST_URI'] = remove_lang(@env['ORIGINAL_REQUEST_URI'])
         @env['REQUEST_PATH'] = remove_lang(@env['REQUEST_PATH']) if @env.key?('REQUEST_PATH')
         @env['PATH_INFO'] = remove_lang(@env['PATH_INFO'])
         @env['ORIGINAL_FULLPATH'] = remove_lang(@env['ORIGINAL_FULLPATH']) if @env.key?('ORIGINAL_FULLPATH')
